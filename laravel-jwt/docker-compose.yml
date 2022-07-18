@@ -1,0 +1,82 @@
+version: "3"
+services:
+    #Laravel App
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: laravel/laravel
+        container_name: app
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "9001:9000"
+        # environment:
+        #     SERVICE_NAME: app
+        #     SERVICE_TAGS: dev
+        # working_dir: /var/www/html
+        volumes:
+            - ./:/var/www/html
+        networks:
+            - mynet
+
+    # Nginx Service
+    nginx:
+        image: nginx:alpine
+        container_name: nginx
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "8000:80"
+        links:
+            - app
+        volumes:
+            - ./:/var/www/html
+            - ./docker/nginx/site.conf:/etc/nginx/conf.d/default.conf:rw
+            - ./docker/logs/nginx:/var/logs/nginx:rw
+        depends_on:
+            - app
+            - db
+        networks:
+            - mynet
+
+    #MySQL Service
+    db:
+        image: mysql:8.0.17
+        container_name: db
+        tty: true
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_DATABASE: JWT
+            MYSQL_USER: root
+            MYSQL_PASSWORD: password
+            MYSQL_ROOT_PASSWORD: password
+        volumes:
+            - mysqldata:/var/lib/mysql
+        networks:
+            - mynet
+
+    redis:
+        image: "redis:alpine"
+        ports:
+            - "${FORWARD_REDIS_PORT:-6379}:6379"
+        volumes:
+            - "sail-redis:/data"
+        networks:
+            - mynet
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            retries: 3
+            timeout: 5s
+
+#Docker Networks
+networks:
+    mynet:
+        driver: bridge
+#Volumes
+volumes:
+    mysqldata:
+        driver: local
+    sail-redis:
+        driver: local
